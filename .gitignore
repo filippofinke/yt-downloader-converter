@@ -1,4 +1,5 @@
 node_modules/
 frontend/video/
 frontend/music/
+backend/info/
 .DS_Store

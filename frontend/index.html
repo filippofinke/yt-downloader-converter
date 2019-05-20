@@ -1,121 +1,163 @@
 <!-- @author Filippo Finke -->
 <!DOCTYPE html>
 <html lang="it" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <title>Youtube downloader and converter</title>
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-  </head>
-  <body>
-    <div class="container">
-      <br>
-      <h3 class="text-center">Youtube downloader and converter.</h3>
-      <p>@filippofinke</p>
-      <div class="input-group">
-        <div class="input-group-prepend">
-          <span class="input-group-text" id="basic-addon1">Youtube link</span>
-        </div>
-        <input id="link" class="form-control" placeholder="https://youtube.com/id" type="text">
-        <button id="button" type="button" class="btn btn-primary">Scarica</button>
-      </div>
-      <br>
-      <div class="row" id="downloads">
 
-      </div>
+<head>
+  <meta charset="utf-8">
+  <title>Youtube downloader and converter</title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+
+<body>
+  <div class="container">
+    <br>
+    <h3 class="text-center">Youtube downloader and converter.</h3>
+    <p>@filippofinke</p>
+    <button id="showdownloads" class="btn btn-outline-primary">Show downloads</button>
+    <div id="alldownloads">
+      <table class="table text-center">
+        <thead>
+          <tr>
+            <th scope="col">Title</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody id="alldownloadsbody">
+
+        </tbody>
+      </table>
     </div>
-  </body>
-  <script type="text/javascript">
+    <div class="input-group">
+      <div class="input-group-prepend">
+        <span class="input-group-text" id="basic-addon1">Youtube link</span>
+      </div>
+      <input id="link" class="form-control" placeholder="https://youtube.com/id" type="text">
+      <button id="button" type="button" class="btn btn-primary">Scarica</button>
+    </div>
+    <br>
+    <div class="row" id="downloads">
 
-    var ws = new WebSocket("ws://127.0.0.1:8080");
-    var connected = false;
-
-    ws.onopen = function() {
-      connected = true;
+    </div>
+  </div>
+</body>
+<script type="text/javascript">
+  var alld = document.getElementById("alldownloads");
+  alld.style.display = "none";
+  document.getElementById("showdownloads").addEventListener('click', function(event) {
+    if (alld.style.display == "none") {
+      document.getElementById("showdownloads").innerHTML = "Hide downloads";
+      alld.style.display = "block";
+    } else {
+      document.getElementById("showdownloads").innerHTML = "Show downloads";
+      alld.style.display = "none";
     }
+  });
 
-    ws.onclose = function() {
-      connected = false;
+  var ws = new WebSocket("ws://127.0.0.1:8080");
+  var connected = false;
+
+  ws.onopen = function() {
+    connected = true;
+    ws.send("getDownloads");
+  }
+
+  ws.onclose = function() {
+    connected = false;
+  }
+
+  ws.onmessage = function(data) {
+    var data = JSON.parse(data.data);
+    var title = data.title;
+    var id = title.hexEncode();
+    var status = data.status;
+    var statusID = id + "-s";
+    var progressID = id + "-p";
+    if (data.fromfile === true) {
+      addToDownloads(data);
+      return;
     }
-
-    ws.onmessage = function(data) {
-      var data = JSON.parse(data.data);
-      var title = data.title;
-      var id = title.hexEncode();
-      var status = data.status;
-      var statusID = id + "-s";
-      var progressID = id + "-p";
-      if(!document.getElementById(id))
-      {
-        var element = `
+    if (!document.getElementById(id)) {
+      var element = `
         <div class="card col-6" id=` + id + `>
           <div class="card-body text-center">
             <h5 class="card-title">` + title + `</h5>
-            <p class="card-text" id="` + statusID + `">` + status + `</p>
+            <p class="card-text" id="` + statusID + `">` + status +
+        `</p>
             <div class="progress" id="` + progressID + `cont">
-              <div id="` + progressID + `" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              <div id="` + progressID +
+        `" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
           </div>
         </div>`;
-        document.getElementById("downloads").innerHTML = element + document.getElementById("downloads").innerHTML;
-      }
-      if(status == "finished")
-      {
-        document.getElementById(statusID).innerHTML = `Finished<br>
-        <video style="width: 100%;" controls>
-          <source src="` + window.location.href.replace(window.location.pathname, '/') + data.videopath + `" type="video/mp4">
-        Your browser does not support the video tag.
-        </video>
-        <br>
-        <audio controls>
-          <source src="` + window.location.href.replace(window.location.pathname, '/') + data.path + `" type="audio/mpeg">
-          Your browser does not support the audio tag.
-        </audio>
-        <br>
+      document.getElementById("downloads").innerHTML = element + document.getElementById("downloads").innerHTML;
+    }
+    if (status == "finished") {
+      updateDownloads();
+      document.getElementById(statusID).innerHTML = `Finished<br>
         <a href="` + window.location.href.replace(window.location.pathname, '/') + data.videopath + `" class="btn btn-primary">Download .mp4</a>
-        <a href="` + window.location.href.replace(window.location.pathname, '/') + data.path + `" class="btn btn-primary">Download .mp3</a>
+        <a href="` + window.location
+        .href.replace(window.location.pathname, '/') + data.path + `" class="btn btn-primary">Download .mp3</a>
         `;
-        document.getElementById(progressID + "cont").remove();
-      }
-      if(typeof data.percent !== "undefined")
-      {
-        document.getElementById(statusID).innerHTML = status + " " + data.percent + "%";
-        document.getElementById(progressID).style.width = data.percent + "%";
-        document.getElementById(progressID).setAttribute("aria-valuenow", data.percent);
-      }
+      document.getElementById(progressID + "cont").remove();
     }
-
-    function start() {
-      if(!connected)
-      {
-        alert("Backend offline :(");
-        return;
-      }
-      var link = document.getElementById("link").value;
-      ws.send(link);
-      document.getElementById("link").value = "";
+    if (typeof data.percent !== "undefined") {
+      document.getElementById(statusID).innerHTML = status + " " + data.percent + "%";
+      document.getElementById(progressID).style.width = data.percent + "%";
+      document.getElementById(progressID).setAttribute("aria-valuenow", data.percent);
     }
-
-    document.getElementById("button").addEventListener('click', function(event){
-      start();
-    });
-    document.getElementById("link").addEventListener("keypress", function(event){
-    	var keycode = (event.keyCode ? event.keyCode : event.which);
-    	if(keycode == '13'){
-    		start();
-    	}
-    });
-
-
-    String.prototype.hexEncode = function(){
-      var hex, i;
-
-      var result = "";
-      for (i=0; i<this.length; i++) {
-          hex = this.charCodeAt(i).toString(16);
-          result += ("000"+hex).slice(-4);
-      }
-
-      return result
   }
-  </script>
+
+  function updateDownloads() {
+    document.getElementById("alldownloadsbody").innerHTML = "";
+    ws.send("getDownloads");
+  }
+
+  function addToDownloads(object) {
+    var dbody = document.getElementById("alldownloadsbody");
+    var toAdd = `
+        <tr>
+          <th scope="row">` + object.title + `</th>
+          <td>
+              <a href="` + window.location.href.replace(window.location.pathname, '/') + object.videopath +
+      `" class="btn btn-outline-primary">Download .mp4</a>
+              <a href="` + window.location.href.replace(window.location.pathname, '/') + object.path + `" class="btn btn-outline-primary">Download .mp3</a>
+          </td>
+        </tr>`;
+    dbody.innerHTML += toAdd;
+  }
+
+  function start() {
+    if (!connected) {
+      alert("Backend offline :(");
+      return;
+    }
+    var link = document.getElementById("link").value;
+    ws.send(link);
+    document.getElementById("link").value = "";
+  }
+
+  document.getElementById("button").addEventListener('click', function(event) {
+    start();
+  });
+  document.getElementById("link").addEventListener("keypress", function(event) {
+    var keycode = (event.keyCode ? event.keyCode : event.which);
+    if (keycode == '13') {
+      start();
+    }
+  });
+
+
+  String.prototype.hexEncode = function() {
+    var hex, i;
+
+    var result = "";
+    for (i = 0; i < this.length; i++) {
+      hex = this.charCodeAt(i).toString(16);
+      result += ("000" + hex).slice(-4);
+    }
+
+    return result
+  }
+</script>
+
 </html>
